@@ -1,27 +1,51 @@
-# Dependencies
+# ============================================================
+# Node.js Dependencies
+# ============================================================
 /backend/node_modules/
 /frontend/node_modules/
+/microservices/**/node_modules/
 
-# Build files
-/backend/dist
-/frontend/build
+# ============================================================
+# Build / Output Files
+# ============================================================
+/backend/dist/
+/frontend/build/
+/microservices/**/dist/
+/microservices/**/build/
 
-# Environment variables
+# ============================================================
+# Environment Files
+# ============================================================
 .env
 .env.local
+/microservices/**/.env
+/microservices/**/.env.local
 
+# ============================================================
 # Logs
+# ============================================================
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# IDE and OS files
-.idea
-.vscode
+# ============================================================
+# IDE and OS Files
+# ============================================================
+.idea/
+.vscode/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 .DS_Store
+
+# ============================================================
+# Optional: Docker / Temporary Files
+# ============================================================
+/docker-data/
+/tmp/
+/coverage/
+/*.pid

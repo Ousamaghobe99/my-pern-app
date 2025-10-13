@@ -163,6 +163,7 @@ class InterfaceService {
         interfaceName,
         serialNumber,
         description,
+        status,
         type,
         currentLocationId,
         qrCodeData
@@ -195,6 +196,7 @@ class InterfaceService {
           interfaceName,
           serialNumber,
           description,
+          status,
           type,
           currentLocationId,
           qrCodeData

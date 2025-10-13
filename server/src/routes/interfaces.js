@@ -1,3 +1,4 @@
+
 import express from 'express';
 import InterfaceController from '../controllers/interfaceController.js';
 import { authenticateToken, requirePermission  } from '../middleware/auth.js';

@@ -168,7 +168,34 @@ class UserController {
       }
     }
   }
+
+  // GET /api/users/matricule/:matricule
+static async getUserByMatricule(req, res) {
+  try {
+    const { matricule } = req.params;
+
+    const user = await UserService.getUserByMatricule(matricule);
+
+    ResponseHelper.success(
+      res,
+      user,
+      'User retrieved successfully',
+      HTTP_STATUS.OK
+    );
+  } catch (error) {
+    Logger.error('Get user by matricule controller error', error);
+
+    if (error.message.includes('not found')) {
+      ResponseHelper.notFound(res, error.message);
+    } else {
+      ResponseHelper.error(res, error.message, HTTP_STATUS.BAD_REQUEST);
+    }
+  }
 }
+}
+
+
+
 
 export default UserController;
 

@@ -49,5 +49,11 @@ router.delete('/:id',
   UserController.deleteUser
 );
 
+// GET /api/users/matricule/:matricule
+router.get('/matricule/:matricule',
+  requirePermission('user:read'),
+  UserController.getUserByMatricule
+);
+
 export default router;
 

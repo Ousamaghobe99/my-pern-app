@@ -404,6 +404,56 @@ class UserService {
       throw error;
     }
   }
+// Get user by matricule
+static async getUserByMatricule(matricule) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { matricule },
+      select: {
+        id: true,
+        matricule: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phoneNumber: true,
+        createdAt: true,
+        updatedAt: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            permissions: {
+              select: {
+                permission: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    // Flatten permissions like in getUserById
+    user.role.permissions = user.role.permissions.map(rp => rp.permission);
+
+    return user;
+  } catch (error) {
+    Logger.error('Get user by matricule error', error);
+    throw error;
+  }
+}
+
+
 }
 
 export default UserService;
