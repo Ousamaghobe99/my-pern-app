@@ -1,24 +1,41 @@
 import { useState } from "react";
-import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from "@/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHead,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Eye, Trash2, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { getStatusColor } from "@/lib/utils";
 import ViewInterfaceDialog from "./ViewInterfaceDialog";
 import EditInterfaceDialog from "./EditInterfaceDialog";
 
-export default function InterfaceTable({ 
-  interfaces, 
-  onDelete, 
+export default function InterfaceTable({
+  interfaces,
+  onDelete,
   onStatusUpdate,
   onUpdate, // New prop for handling updates
-  isDeleting, 
-  isUpdating, 
-  isLoading, 
-  error, 
+  isDeleting,
+  isUpdating,
+  isLoading,
+  error,
   onRetry,
-  formOptions // New prop for form options
+  formOptions, // New prop for form options
 }) {
   const [viewInterface, setViewInterface] = useState(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -83,8 +100,12 @@ export default function InterfaceTable({
             <TableRow>
               <TableCell colSpan={7} className="text-center py-8">
                 <div className="flex flex-col items-center justify-center">
-                  <p className="text-red-500 font-semibold mb-2">Failed to load interfaces</p>
-                  <p className="text-muted-foreground mb-4">{error?.message || "Please try again later"}</p>
+                  <p className="text-red-500 font-semibold mb-2">
+                    Failed to load interfaces
+                  </p>
+                  <p className="text-muted-foreground mb-4">
+                    {error?.message || "Please try again later"}
+                  </p>
                   <Button onClick={onRetry}>Retry</Button>
                 </div>
               </TableCell>
@@ -98,30 +119,38 @@ export default function InterfaceTable({
           ) : (
             interfaces.map((i) => (
               <TableRow key={i.id}>
-                <TableCell className="font-medium">{i.interfaceName || 'N/A'}</TableCell>
-                <TableCell>{i.serialNumber || 'N/A'}</TableCell>
+                <TableCell className="font-medium">
+                  {i.interfaceName || "N/A"}
+                </TableCell>
+                <TableCell>{i.serialNumber || "N/A"}</TableCell>
                 <TableCell>{i.type}</TableCell>
                 <TableCell>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(i.status)}`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(
+                      i.status
+                    )}`}
+                  >
                     {i.status}
                   </span>
                 </TableCell>
-                <TableCell>{i.currentLocation?.name || 'No Location'}</TableCell>
+                <TableCell>
+                  {i.currentLocation?.name || "No Location"}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {i.updatedAt ? format(new Date(i.updatedAt), 'Pp') : 'N/A'}
+                  {i.updatedAt ? format(new Date(i.updatedAt), "Pp") : "N/A"}
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleViewInterface(i)}
                     >
                       <Eye className="h-3 w-3 mr-1" /> View
                     </Button>
-                    
-                    <Button 
-                      variant="outline" 
+
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleEditInterface(i)}
                       disabled={isUpdating}
@@ -129,7 +158,7 @@ export default function InterfaceTable({
                     >
                       <Edit className="h-3 w-3 mr-1" /> Edit
                     </Button>
-                    
+
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
@@ -145,9 +174,11 @@ export default function InterfaceTable({
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the interface 
+                            This action cannot be undone. This will permanently
+                            delete the interface
                             <strong> "{i.interfaceName}" </strong>
-                            with serial number <strong>"{i.serialNumber}"</strong>.
+                            with serial number{" "}
+                            <strong>"{i.serialNumber}"</strong>.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -155,7 +186,9 @@ export default function InterfaceTable({
                             Cancel
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDeleteConfirm(i.id, i.interfaceName)}
+                            onClick={() =>
+                              handleDeleteConfirm(i.id, i.interfaceName)
+                            }
                             disabled={isDeleting}
                             className="bg-red-600 hover:bg-red-700"
                           >
@@ -193,4 +226,4 @@ export default function InterfaceTable({
       />
     </>
   );
-} 
+}

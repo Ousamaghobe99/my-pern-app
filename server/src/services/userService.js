@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import prisma from '../config/database.js';
 import { ERROR_MESSAGES, PAGINATION  } from '../utils/constants.js';
 import Logger from '../utils/logger.js';
+import emailService from './emailService.js';
+import crypto from 'crypto';
 
 class UserService {
   // Get all users with pagination and filtering
