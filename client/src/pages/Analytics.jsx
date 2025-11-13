@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -13,8 +13,8 @@ import {
   Cell,
   LineChart,
   Line,
-  Area,
-  AreaChart
+  AreaChart,
+  Area
 } from 'recharts';
 import { 
   TrendingUp, 
@@ -23,81 +23,175 @@ import {
   Monitor, 
   MapPin, 
   Wrench,
-  Calendar,
   Activity,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Filter
+  Filter,
+  Loader2,
+  Download
 } from 'lucide-react';
 import {
   useUserStatistics,
   useInterfaceStatistics,
   useLocationStatistics,
-  useMaintenanceStatistics
+  useMaintenanceStatistics,
+  useInterfaces,
+  useLocations,
+  useMaintenanceTickets
 } from '../hooks/useApi';
+import { 
+  formatNumber, 
+  formatPercentage, 
+  formatRelativeTime,
+  capitalizeFirst,
+  cn
+} from '../lib/utils';
 
 const AnalyticsPage = () => {
   const [timeRange, setTimeRange] = useState('7d');
-  const [selectedMetric, setSelectedMetric] = useState('all');
 
   // API hooks
-  const { data: userStats = {} } = useUserStatistics();
-  const { data: interfaceStats = {} } = useInterfaceStatistics();
-  const { data: locationStats = {} } = useLocationStatistics();
-  const { data: maintenanceStats = {} } = useMaintenanceStatistics();
+  const { data: userStats, isLoading: loadingUsers } = useUserStatistics();
+  const { data: interfaceStats, isLoading: loadingInterfaces } = useInterfaceStatistics();
+  const { data: locationStats, isLoading: loadingLocations } = useLocationStatistics();
+  const { data: maintenanceStats, isLoading: loadingMaintenance } = useMaintenanceStatistics();
+  
+  // Get detailed data
+  const { data: interfacesResponse } = useInterfaces({ limit: 1000 });
+  const { data: locationsResponse } = useLocations({ limit: 100 });
+  const { data: maintenanceResponse } = useMaintenanceTickets({ limit: 1000 });
 
-  // Mock data for charts - in real app, this would come from your API
-  const interfaceStatusData = [
-    { name: 'Available', value: 45, color: '#10B981' },
-    { name: 'In Use', value: 30, color: '#3B82F6' },
-    { name: 'Under Maintenance', value: 15, color: '#F59E0B' },
-    { name: 'Retired', value: 8, color: '#6B7280' },
-    { name: 'Disposed', value: 2, color: '#EF4444' }
-  ];
+  const isLoading = loadingUsers || loadingInterfaces || loadingLocations || loadingMaintenance;
 
-  const maintenanceTypesData = [
-    { name: 'Corrective', value: 35, color: '#EF4444' },
-    { name: 'Preventive', value: 40, color: '#10B981' },
-    { name: 'Calibration', value: 15, color: '#3B82F6' },
-    { name: 'Upgrade', value: 8, color: '#8B5CF6' },
-    { name: 'Inspection', value: 2, color: '#F59E0B' }
-  ];
+  // Extract data arrays
+  const interfaces = useMemo(() => {
+    return interfacesResponse?.interfaces || interfacesResponse?.data?.interfaces || [];
+  }, [interfacesResponse]);
 
-  const monthlyTrendsData = [
-    { month: 'Jan', interfaces: 85, maintenance: 12, users: 45 },
-    { month: 'Feb', interfaces: 88, maintenance: 15, users: 48 },
-    { month: 'Mar', interfaces: 92, maintenance: 18, users: 52 },
-    { month: 'Apr', interfaces: 89, maintenance: 14, users: 55 },
-    { month: 'May', interfaces: 95, maintenance: 20, users: 58 },
-    { month: 'Jun', interfaces: 98, maintenance: 16, users: 62 },
-    { month: 'Jul', interfaces: 100, maintenance: 22, users: 65 }
-  ];
+  const locations = useMemo(() => {
+    return locationsResponse?.locations || locationsResponse || [];
+  }, [locationsResponse]);
 
-  const locationUtilizationData = [
-    { name: 'Lab A', utilization: 85, capacity: 100 },
-    { name: 'Lab B', utilization: 72, capacity: 80 },
-    { name: 'Storage', utilization: 45, capacity: 200 },
-    { name: 'Maintenance', utilization: 30, capacity: 50 },
-    { name: 'Lab C', utilization: 68, capacity: 90 }
-  ];
+  const maintenanceTickets = useMemo(() => {
+    return maintenanceResponse?.tickets || maintenanceResponse || [];
+  }, [maintenanceResponse]);
 
-  const usagePatternData = [
-    { hour: '00', usage: 5 },
-    { hour: '02', usage: 3 },
-    { hour: '04', usage: 2 },
-    { hour: '06', usage: 8 },
-    { hour: '08', usage: 25 },
-    { hour: '10', usage: 45 },
-    { hour: '12', usage: 38 },
-    { hour: '14', usage: 52 },
-    { hour: '16', usage: 48 },
-    { hour: '18', usage: 35 },
-    { hour: '20', usage: 22 },
-    { hour: '22', usage: 12 }
-  ];
+  // Process interface status distribution
+  const interfaceStatusData = useMemo(() => {
+    if (!interfaceStats?.statusDistribution) return [];
+    
+    const colors = {
+      'AVAILABLE': '#10B981',
+      'IN_USE': '#3B82F6',
+      'UNDER_MAINTENANCE': '#F59E0B',
+      'RETIRED': '#6B7280',
+      'DISPOSED': '#EF4444'
+    };
 
-  const StatCard = ({ title, value, change, changeType, icon: Icon, color = 'blue' }) => {
+    return interfaceStats.statusDistribution.map(item => ({
+      name: capitalizeFirst(item.status.replace(/_/g, ' ').toLowerCase()),
+      value: item.count,
+      color: colors[item.status] || '#6B7280',
+      percentage: formatPercentage(item.count, interfaceStats.total)
+    }));
+  }, [interfaceStats]);
+
+  // Process maintenance types distribution
+  const maintenanceTypesData = useMemo(() => {
+    if (!maintenanceStats?.typeDistribution) return [];
+    
+    const colors = {
+      'CORRECTIVE': '#EF4444',
+      'PREVENTIVE': '#10B981',
+      'CALIBRATION': '#3B82F6',
+      'UPGRADE': '#8B5CF6',
+      'INSPECTION': '#F59E0B'
+    };
+
+    return maintenanceStats.typeDistribution.map(item => ({
+      name: capitalizeFirst(item.type.toLowerCase()),
+      value: item.count,
+      color: colors[item.type] || '#6B7280'
+    }));
+  }, [maintenanceStats]);
+
+  // Process maintenance status distribution
+  const maintenanceStatusData = useMemo(() => {
+    if (!maintenanceStats?.statusDistribution) return [];
+    
+    const colors = {
+      'OPEN': '#EF4444',
+      'IN_PROGRESS': '#F59E0B',
+      'RESOLVED': '#10B981',
+      'CLOSED': '#6B7280',
+      'ON_HOLD': '#F97316'
+    };
+
+    return maintenanceStats.statusDistribution.map(item => ({
+      name: capitalizeFirst(item.status.replace(/_/g, ' ').toLowerCase()),
+      value: item.count,
+      color: colors[item.status] || '#6B7280'
+    }));
+  }, [maintenanceStats]);
+
+  // Process location utilization
+  const locationUtilizationData = useMemo(() => {
+    if (!locations || locations.length === 0) return [];
+    
+    return locations
+      .map(location => ({
+        name: location.name || 'Unknown',
+        utilization: location._count?.interfaces || 0,
+        capacity: location.capacity || 100,
+        percentage: formatPercentage(
+          location._count?.interfaces || 0, 
+          location.capacity || 100
+        )
+      }))
+      .sort((a, b) => b.utilization - a.utilization)
+      .slice(0, 5); // Top 5 locations
+  }, [locations]);
+
+  // Calculate utilization rate
+  const utilizationRate = useMemo(() => {
+    if (!interfaceStats?.statusDistribution) return '0%';
+    const inUse = interfaceStats.statusDistribution.find(s => s.status === 'IN_USE')?.count || 0;
+    const total = interfaceStats.total || 1;
+    return formatPercentage(inUse, total);
+  }, [interfaceStats]);
+
+  // Calculate availability rate
+  const availabilityRate = useMemo(() => {
+    if (!interfaceStats?.statusDistribution) return '0%';
+    const available = interfaceStats.statusDistribution.find(s => s.status === 'AVAILABLE')?.count || 0;
+    const total = interfaceStats.total || 1;
+    return formatPercentage(available, total);
+  }, [interfaceStats]);
+
+  // Handle export
+  const handleExport = () => {
+    const data = {
+      userStats,
+      interfaceStats,
+      locationStats,
+      maintenanceStats,
+      generatedAt: new Date().toISOString(),
+      timeRange
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics-report-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const StatCard = ({ title, value, change, changeType, icon: Icon, color = 'blue', isLoading }) => {
     const colorClasses = {
       blue: 'bg-blue-100 text-blue-600',
       green: 'bg-green-100 text-green-600',
@@ -106,12 +200,22 @@ const AnalyticsPage = () => {
       purple: 'bg-purple-100 text-purple-600'
     };
 
+    if (isLoading) {
+      return (
+        <div className="bg-white p-6 rounded-lg border shadow-sm">
+          <div className="flex items-center justify-center h-24">
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-white p-6 rounded-lg border">
+      <div className="bg-white p-6 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <p className="text-sm text-gray-600 mb-1">{title}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="text-3xl font-bold text-gray-900">{value}</p>
             {change && (
               <div className="flex items-center mt-2">
                 {changeType === 'increase' ? (
@@ -119,15 +223,18 @@ const AnalyticsPage = () => {
                 ) : (
                   <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                 )}
-                <span className={`text-sm ${changeType === 'increase' ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={cn(
+                  'text-sm font-medium',
+                  changeType === 'increase' ? 'text-green-600' : 'text-red-600'
+                )}>
                   {change}
                 </span>
                 <span className="text-sm text-gray-500 ml-1">vs last period</span>
               </div>
             )}
           </div>
-          <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
-            <Icon className="w-6 h-6" />
+          <div className={cn('p-4 rounded-lg', colorClasses[color])}>
+            <Icon className="w-7 h-7" />
           </div>
         </div>
       </div>
@@ -137,12 +244,21 @@ const AnalyticsPage = () => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-3 border rounded-lg shadow-lg">
-          <p className="font-medium">{label}</p>
+        <div className="bg-white p-4 border rounded-lg shadow-lg">
+          <p className="font-semibold text-gray-900 mb-2">{label}</p>
           {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className="text-sm">
-              {entry.name}: {entry.value}
-            </p>
+            <div key={index} className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-sm text-gray-600">{entry.name}:</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900">
+                {formatNumber(entry.value)}
+              </span>
+            </div>
           ))}
         </div>
       );
@@ -150,19 +266,35 @@ const AnalyticsPage = () => {
     return null;
   };
 
+  const EmptyState = ({ message = "No data available" }) => (
+    <div className="h-[300px] flex flex-col items-center justify-center text-gray-500">
+      <Activity className="w-12 h-12 mb-2 text-gray-300" />
+      <p className="text-sm">{message}</p>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-screen">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
+        <span className="text-lg text-gray-600">Loading analytics dashboard...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <p className="text-gray-600">System performance and usage insights</p>
+          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <p className="text-gray-600 mt-1">System performance and usage insights</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
             <option value="24h">Last 24 Hours</option>
             <option value="7d">Last 7 Days</option>
@@ -170,411 +302,360 @@ const AnalyticsPage = () => {
             <option value="90d">Last 90 Days</option>
             <option value="1y">Last Year</option>
           </select>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-            <Filter size={18} />
-            Export Report
+          <button 
+            onClick={handleExport}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Download size={18} />
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Total Interfaces"
-          value={interfaceStats.total || 100}
-          change="+12%"
-          changeType="increase"
+          value={formatNumber(interfaceStats?.total || 0)}
           icon={Monitor}
           color="blue"
+          isLoading={loadingInterfaces}
         />
         <StatCard
           title="Active Users"
-          value={userStats.active || 65}
-          change="+8%"
-          changeType="increase"
+          value={formatNumber(userStats?.total || 0)}
           icon={Users}
           color="green"
+          isLoading={loadingUsers}
         />
         <StatCard
           title="Open Tickets"
-          value={maintenanceStats.open || 23}
-          change="-5%"
-          changeType="decrease"
+          value={formatNumber(maintenanceStats?.open || 0)}
           icon={AlertTriangle}
           color="yellow"
+          isLoading={loadingMaintenance}
         />
         <StatCard
           title="Locations"
-          value={locationStats.total || 15}
-          change="+2%"
-          changeType="increase"
+          value={formatNumber(locationStats?.total || 0)}
           icon={MapPin}
           color="purple"
+          isLoading={loadingLocations}
         />
         <StatCard
-          title="Avg Utilization"
-          value="78%"
-          change="+3%"
-          changeType="increase"
+          title="Utilization"
+          value={utilizationRate}
           icon={Activity}
           color="blue"
+          isLoading={loadingInterfaces}
         />
       </div>
 
-      {/* Charts Row 1 */}
+      {/* Charts Row 1 - Status Distributions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Interface Status Distribution */}
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Interface Status Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={interfaceStatusData}
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {interfaceStatusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="bg-white p-6 rounded-lg border shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Interface Status</h3>
+            <span className="text-sm text-gray-500">
+              Total: {formatNumber(interfaceStats?.total || 0)}
+            </span>
+          </div>
+          {interfaceStatusData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={interfaceStatusData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percentage }) => `${name} (${percentage})`}
+                  labelLine={false}
+                >
+                  {interfaceStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="No interface data available" />
+          )}
         </div>
 
-        {/* Maintenance Types */}
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Maintenance Types</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={maintenanceTypesData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" fill="#3B82F6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        {/* Monthly Trends */}
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Trends</h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={monthlyTrendsData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="interfaces" 
-                stroke="#3B82F6" 
-                name="Interfaces"
-                strokeWidth={2}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="maintenance" 
-                stroke="#EF4444" 
-                name="Maintenance Tickets"
-                strokeWidth={2}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="users" 
-                stroke="#10B981" 
-                name="Active Users"
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        {/* Maintenance Status Distribution */}
+        <div className="bg-white p-6 rounded-lg border shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Maintenance Status</h3>
+            <span className="text-sm text-gray-500">
+              Total: {formatNumber(maintenanceStats?.total || 0)}
+            </span>
+          </div>
+          {maintenanceStatusData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={maintenanceStatusData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, value }) => `${name} (${value})`}
+                  labelLine={false}
+                >
+                  {maintenanceStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="No maintenance data available" />
+          )}
         </div>
       </div>
 
-      {/* Charts Row 3 */}
+      {/* Charts Row 2 - Bar Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Location Utilization */}
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Utilization</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={locationUtilizationData} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={80} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="utilization" fill="#10B981" />
-              <Bar dataKey="capacity" fill="#E5E7EB" />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Maintenance Types */}
+        <div className="bg-white p-6 rounded-lg border shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Maintenance by Type</h3>
+          {maintenanceTypesData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={maintenanceTypesData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {maintenanceTypesData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="No maintenance type data available" />
+          )}
         </div>
 
-        {/* Usage Patterns */}
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Usage Pattern</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={usagePatternData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
-              <YAxis />
-              <Tooltip content={<CustomTooltip />} />
-              <Area 
-                type="monotone" 
-                dataKey="usage" 
-                stroke="#3B82F6" 
-                fill="#3B82F6" 
-                fillOpacity={0.3}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        {/* Location Utilization */}
+        <div className="bg-white p-6 rounded-lg border shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Location Utilization</h3>
+          {locationUtilizationData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={locationUtilizationData} layout="horizontal">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Bar dataKey="utilization" fill="#10B981" name="Current" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="capacity" fill="#E5E7EB" name="Capacity" radius={[0, 8, 8, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="No location data available" />
+          )}
         </div>
       </div>
 
-      {/* Quick Stats Table */}
-      <div className="bg-white rounded-lg border">
+      {/* Quick Stats Grid */}
+      <div className="bg-white rounded-lg border shadow-sm">
         <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">Quick Statistics</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Detailed Statistics</h3>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Interface Stats */}
+            {/* Interface Metrics */}
             <div>
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Interface Metrics</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Available</span>
-                  <span className="text-sm font-medium text-green-600">45</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">In Use</span>
-                  <span className="text-sm font-medium text-blue-600">30</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Maintenance</span>
-                  <span className="text-sm font-medium text-yellow-600">15</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Utilization Rate</span>
-                  <span className="text-sm font-medium text-gray-900">67%</span>
+              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Monitor className="w-4 h-4" />
+                Interface Metrics
+              </h4>
+              <div className="space-y-3">
+                {interfaceStats?.statusDistribution?.map((status) => (
+                  <div key={status.status} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 capitalize">
+                      {status.status.replace(/_/g, ' ').toLowerCase()}
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      {formatNumber(status.count)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-gray-900">Total</span>
+                  <span className="text-sm font-bold text-blue-600">
+                    {formatNumber(interfaceStats?.total || 0)}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Maintenance Stats */}
+            {/* Maintenance Metrics */}
             <div>
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Maintenance Metrics</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
+              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Wrench className="w-4 h-4" />
+                Maintenance Metrics
+              </h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Open Tickets</span>
-                  <span className="text-sm font-medium text-red-600">23</span>
+                  <span className="text-sm font-semibold text-red-600">
+                    {formatNumber(maintenanceStats?.open || 0)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">In Progress</span>
-                  <span className="text-sm font-medium text-yellow-600">12</span>
+                  <span className="text-sm font-semibold text-yellow-600">
+                    {formatNumber(maintenanceStats?.inProgress || 0)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Resolved Today</span>
-                  <span className="text-sm font-medium text-green-600">8</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Completed</span>
+                  <span className="text-sm font-semibold text-green-600">
+                    {formatNumber(maintenanceStats?.completed || 0)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Avg Resolution Time</span>
-                  <span className="text-sm font-medium text-gray-900">2.3 days</span>
+                <div className="flex justify-between items-center pt-3 border-t">
+                  <span className="text-sm font-medium text-gray-900">Total</span>
+                  <span className="text-sm font-bold text-blue-600">
+                    {formatNumber(maintenanceStats?.total || 0)}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* User Stats */}
+            {/* User Metrics */}
             <div>
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">User Metrics</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
+              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                User Metrics
+              </h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Total Users</span>
-                  <span className="text-sm font-medium text-gray-900">65</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {formatNumber(userStats?.total || 0)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Active Today</span>
-                  <span className="text-sm font-medium text-green-600">45</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Recent Users</span>
+                  <span className="text-sm font-semibold text-green-600">
+                    {formatNumber(userStats?.recentUsers || 0)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">New This Month</span>
-                  <span className="text-sm font-medium text-blue-600">7</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Activity Rate</span>
-                  <span className="text-sm font-medium text-gray-900">69%</span>
-                </div>
+                {userStats?.roleDistribution?.slice(0, 2).map((role) => (
+                  <div key={role.roleId} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">{role.roleName}</span>
+                    <span className="text-sm font-semibold text-blue-600">
+                      {formatNumber(role.count)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Location Stats */}
+            {/* Location Metrics */}
             <div>
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Location Metrics</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
+              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Location Metrics
+              </h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Total Locations</span>
-                  <span className="text-sm font-medium text-gray-900">15</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {formatNumber(locationStats?.total || 0)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">At Capacity</span>
-                  <span className="text-sm font-medium text-red-600">3</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Low Usage</span>
-                  <span className="text-sm font-medium text-yellow-600">5</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Avg Occupancy</span>
-                  <span className="text-sm font-medium text-gray-900">72%</span>
-                </div>
+                {locationStats?.typeDistribution?.slice(0, 3).map((type) => (
+                  <div key={type.type} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600 capitalize">
+                      {type.type.toLowerCase()}
+                    </span>
+                    <span className="text-sm font-semibold text-blue-600">
+                      {formatNumber(type.count)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Movements */}
-        <div className="bg-white rounded-lg border">
-          <div className="px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Interface Movements</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {[
-                { id: 1, interface: 'Device-001', from: 'Lab A', to: 'Maintenance', time: '2 hours ago', type: 'maintenance' },
-                { id: 2, interface: 'Device-045', from: 'Storage', to: 'Lab B', time: '4 hours ago', type: 'deployment' },
-                { id: 3, interface: 'Device-023', from: 'Lab C', to: 'Storage', time: '6 hours ago', type: 'retrieval' },
-                { id: 4, interface: 'Device-078', from: 'Maintenance', to: 'Lab A', time: '8 hours ago', type: 'deployment' },
-                { id: 5, interface: 'Device-056', from: 'Lab B', to: 'Calibration', time: '1 day ago', type: 'calibration' }
-              ].map((movement) => (
-                <div key={movement.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      movement.type === 'maintenance' ? 'bg-yellow-400' :
-                      movement.type === 'deployment' ? 'bg-green-400' :
-                      movement.type === 'retrieval' ? 'bg-blue-400' :
-                      'bg-purple-400'
-                    }`}></div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{movement.interface}</p>
-                      <p className="text-xs text-gray-500">{movement.from} → {movement.to}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">{movement.time}</p>
-                    <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                      movement.type === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
-                      movement.type === 'deployment' ? 'bg-green-100 text-green-800' :
-                      movement.type === 'retrieval' ? 'bg-blue-100 text-blue-800' :
-                      'bg-purple-100 text-purple-800'
-                    }`}>
-                      {movement.type}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* System Health */}
-        <div className="bg-white rounded-lg border">
-          <div className="px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold text-gray-900">System Health</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {[
-                { metric: 'Interface Availability', value: 95, status: 'excellent', target: 98 },
-                { metric: 'User Satisfaction', value: 88, status: 'good', target: 90 },
-                { metric: 'Maintenance Response', value: 92, status: 'good', target: 95 },
-                { metric: 'System Uptime', value: 99.8, status: 'excellent', target: 99.5 },
-                { metric: 'Location Utilization', value: 78, status: 'fair', target: 85 }
-              ].map((health, index) => (
-                <div key={index}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">{health.metric}</span>
-                    <span className="text-sm text-gray-900">{health.value}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        health.status === 'excellent' ? 'bg-green-500' :
-                        health.status === 'good' ? 'bg-blue-500' :
-                        'bg-yellow-500'
-                      }`}
-                      style={{ width: `${health.value}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className={`text-xs ${
-                      health.status === 'excellent' ? 'text-green-600' :
-                      health.status === 'good' ? 'text-blue-600' :
-                      'text-yellow-600'
-                    }`}>
-                      {health.status.charAt(0).toUpperCase() + health.status.slice(1)}
-                    </span>
-                    <span className="text-xs text-gray-500">Target: {health.target}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Alerts & Notifications */}
-      <div className="bg-white rounded-lg border">
+      {/* System Health */}
+      <div className="bg-white rounded-lg border shadow-sm">
         <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">System Alerts & Recommendations</h3>
+          <h3 className="text-lg font-semibold text-gray-900">System Health Indicators</h3>
         </div>
         <div className="p-6">
-          <div className="space-y-4">
-            {[
-              {
-                type: 'warning',
-                title: 'High Maintenance Load',
-                message: 'Lab A has 5 interfaces requiring maintenance. Consider redistributing workload.',
-                time: '1 hour ago'
-              },
-              {
-                type: 'info',
-                title: 'Calibration Due',
-                message: '12 interfaces are due for calibration within the next 7 days.',
-                time: '3 hours ago'
-              },
-              {
-                type: 'success',
-                title: 'Efficiency Improvement',
-                message: 'Overall system efficiency has improved by 8% this month.',
-                time: '1 day ago'
-              }
-            ].map((alert, index) => (
-              <div key={index} className="flex items-start space-x-3 p-4 rounded-lg bg-gray-50">
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                  alert.type === 'warning' ? 'bg-yellow-100' :
-                  alert.type === 'info' ? 'bg-blue-100' :
-                  'bg-green-100'
-                }`}>
-                  {alert.type === 'warning' && <AlertTriangle className="w-4 h-4 text-yellow-600" />}
-                  {alert.type === 'info' && <Clock className="w-4 h-4 text-blue-600" />}
-                  {alert.type === 'success' && <CheckCircle className="w-4 h-4 text-green-600" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{alert.title}</p>
-                  <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
-                  <p className="text-xs text-gray-500 mt-2">{alert.time}</p>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Availability */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-medium text-gray-700">Interface Availability</span>
+                <span className="text-sm font-bold text-gray-900">{availabilityRate}</span>
               </div>
-            ))}
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-3 rounded-full bg-green-500 transition-all duration-500"
+                  style={{ width: availabilityRate }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {interfaceStats?.statusDistribution?.find(s => s.status === 'AVAILABLE')?.count || 0} interfaces available
+              </p>
+            </div>
+
+            {/* Utilization */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-medium text-gray-700">Overall Utilization</span>
+                <span className="text-sm font-bold text-gray-900">{utilizationRate}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-3 rounded-full bg-blue-500 transition-all duration-500"
+                  style={{ width: utilizationRate }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {interfaceStats?.statusDistribution?.find(s => s.status === 'IN_USE')?.count || 0} interfaces in use
+              </p>
+            </div>
+
+            {/* Maintenance Load */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-medium text-gray-700">Maintenance Load</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {maintenanceStats?.total > 0
+                    ? formatPercentage(maintenanceStats.open || 0, maintenanceStats.total)
+                    : '0%'}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-3 rounded-full bg-yellow-500 transition-all duration-500"
+                  style={{ 
+                    width: maintenanceStats?.total > 0
+                      ? formatPercentage(maintenanceStats.open || 0, maintenanceStats.total)
+                      : '0%'
+                  }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {formatNumber(maintenanceStats?.open || 0)} open tickets
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { usersAPI } from '../lib/api'
-import { generatePassword } from '../lib/utils'
+
 
 export function useUserOperations() {
   const queryClient = useQueryClient()
@@ -92,43 +92,49 @@ export function useUserOperations() {
   })
 
   // Handle Create User
-  const handleCreateUser = useCallback(async (userData) => {
-    setIsCreating(true)
-    try {
-      console.log('Starting user creation process')
-      
-      // Generate temporary password
-      const password = generatePassword()
-      
-      console.log('Generated password')
-
-      const userWithPassword = {
-        ...userData,
-        password
-      }
-
-      // Create user
-      const result = await createMutation.mutateAsync(userWithPassword)
-      console.log('User created, result:', result)
-
-      // Send credentials email with matricule from backend response
-      if (result?.id) {
-        console.log('Sending credentials email to:', userData.email)
-        console.log('User matricule:', result.matricule)
-        await sendCredentialsMutation.mutateAsync({
-          userId: result.id,
-          email: userData.email
+ const handleCreateUser = useCallback(async (userData) => {
+  setIsCreating(true)
+  try {
+    console.log('Creating user with data:', userData)
+    const result = await createMutation.mutateAsync(userData)
+    console.log('User created successfully:', result)
+    return { success: true, data: result }
+  } catch (error) {
+    console.error('Error creating user:', error)
+    
+    const status = error?.response?.status
+    // Get the error message from backend
+    const message = error?.response?.data?.message || error.message || 'Failed to create user'
+    
+    // The backend already sends specific messages, just use them!
+    if (status === 409) {
+      // Conflict: email or matricule already exists
+      toast.error(message)
+      return { success: false, error: message, type: 'conflict' }
+    } else if (status === 422) {
+      // Validation errors
+      const errorData = error?.response?.data
+      const fieldErrors = {}
+      if (errorData?.errors) {
+        errorData.errors.forEach(err => {
+          fieldErrors[err.field] = err.message
         })
       }
-
-      return true
-    } catch (error) {
-      console.error('Error in handleCreateUser:', error)
-      return false
-    } finally {
-      setIsCreating(false)
+      toast.error('Please fix the validation errors')
+      return { success: false, fieldErrors, type: 'validation' }
+    } else if (status === 404) {
+      // Invalid role
+      toast.error(message)
+      return { success: false, error: message, type: 'not_found' }
+    } else {
+      // Any other error
+      toast.error(message)
+      return { success: false, error: message, type: 'unknown' }
     }
-  }, [createMutation, sendCredentialsMutation])
+  } finally {
+    setIsCreating(false)
+  }
+}, [createMutation])
 
   // Handle Update User
   const handleUpdateUser = useCallback(async (userId, userData) => {

@@ -11,17 +11,33 @@ class RabbitMQService {
   async connect() {
     try {
       const rabbitmqUrl = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+      const deadLetterRoutingKey = process.env.EMAIL_DLQ || 'email_dead_letter_queue';
       
       this.connection = await amqp.connect(rabbitmqUrl);
       this.channel = await this.connection.createChannel();
-      
-      // Assert the email queue exists
+
+      // ✅ EMAIL QUEUE (existing)
       await this.channel.assertQueue(process.env.EMAIL_QUEUE || 'email_queue', {
-        durable: true
+        durable: true,
+        arguments: {
+          'x-dead-letter-exchange': '',
+          'x-dead-letter-routing-key': deadLetterRoutingKey
+        }
       });
-      
+
+      // 🆕 NOTIFICATION QUEUE (new)
+      await this.channel.assertQueue(process.env.NOTIFICATION_QUEUE || 'notifications', {
+        durable: true,
+        arguments: {
+          'x-dead-letter-exchange': '',
+          'x-dead-letter-routing-key': 'notification_dead_letter_queue'
+        }
+      });
+
       this.isConnected = true;
       Logger.info('✓ RabbitMQ connected successfully');
+      Logger.info('✓ Email queue configured');
+      Logger.info('✓ Notification queue configured');
 
       // Handle connection errors
       this.connection.on('error', (err) => {
@@ -39,11 +55,6 @@ class RabbitMQService {
     } catch (error) {
       Logger.error('Failed to connect to RabbitMQ:', error.message);
       this.isConnected = false;
-      
-      // Retry connection after 5 seconds
-      Logger.info('Retrying RabbitMQ connection in 5 seconds...');
-      setTimeout(() => this.connect(), 5000);
-      
       throw error;
     }
   }
@@ -51,18 +62,23 @@ class RabbitMQService {
   async publishToQueue(queueName, data) {
     if (!this.isConnected || !this.channel) {
       Logger.warn('RabbitMQ not connected, attempting to reconnect...');
-      await this.connect();
+      try {
+        await this.connect();
+      } catch (e) {
+        Logger.error('Cannot publish: Reconnection failed.', e);
+        throw new Error('RabbitMQ unavailable for publishing.');
+      }
     }
 
     try {
       const message = Buffer.from(JSON.stringify(data));
-      
+
       // Send to queue with persistence
       this.channel.sendToQueue(queueName, message, {
         persistent: true,
         contentType: 'application/json'
       });
-      
+
       Logger.info(`✓ Message published to ${queueName}`);
       return true;
 
@@ -74,7 +90,14 @@ class RabbitMQService {
 
   async publishEmail(emailData) {
     const queueName = process.env.EMAIL_QUEUE || 'email_queue';
+    console.log('📤 Sending email to RabbitMQ:', JSON.stringify(emailData, null, 2));
     return await this.publishToQueue(queueName, emailData);
+  }
+
+  async publishNotification(notificationData) {
+    const queueName = process.env.NOTIFICATION_QUEUE || 'notifications';
+    console.log('📤 Sending notification to RabbitMQ:', JSON.stringify(notificationData, null, 2));
+    return await this.publishToQueue(queueName, notificationData);
   }
 
   async close() {
@@ -100,7 +123,5 @@ class RabbitMQService {
   }
 }
 
-// Create and export singleton instance
 const rabbitmqService = new RabbitMQService();
-
 export default rabbitmqService;

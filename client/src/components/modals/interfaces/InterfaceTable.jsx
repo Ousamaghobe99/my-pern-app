@@ -1,41 +1,23 @@
 import { useState } from "react";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHead,
+  Table,TableHeader,TableBody,
+  TableRow,TableCell,TableHead,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog,AlertDialogAction,AlertDialogCancel,
+  AlertDialogContent,AlertDialogDescription,
+  AlertDialogFooter,AlertDialogHeader,AlertDialogTitle,AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Eye, Trash2, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { getStatusColor } from "@/lib/utils";
 import ViewInterfaceDialog from "./ViewInterfaceDialog";
 import EditInterfaceDialog from "./EditInterfaceDialog";
-
 export default function InterfaceTable({
-  interfaces,
-  onDelete,
-  onStatusUpdate,
-  onUpdate, // New prop for handling updates
-  isDeleting,
-  isUpdating,
-  isLoading,
-  error,
-  onRetry,
-  formOptions, // New prop for form options
+  interfaces,onDelete,
+  onStatusUpdate,onUpdate,
+  isDeleting,isUpdating,isLoading,error,onRetry,formOptions, 
 }) {
   const [viewInterface, setViewInterface] = useState(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -46,7 +28,6 @@ export default function InterfaceTable({
     setViewInterface(interfaceData);
     setIsViewDialogOpen(true);
   };
-
   const handleEditInterface = (interfaceData) => {
     setEditInterface(interfaceData);
     setIsEditDialogOpen(true);

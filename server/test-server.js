@@ -1,43 +1,70 @@
-import express from 'express';
-import cors from 'cors';
+import app from './src/app.js';
 import config from './src/config/env.js';
-import ResponseHelper from './src/utils/responseHelper.js';
-
-const app = express();
-
-// Basic middleware
-app.use(cors());
-app.use(express.json());
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  ResponseHelper.success(res, {
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: config.nodeEnv
-  }, 'Server is healthy');
-});
+import Logger from './src/utils/logger.js';
+import prisma from './src/config/database.js';
 
 // Test database connection
-app.get('/test-db', async (req, res) => {
+async function testDatabaseConnection() {
   try {
-    const { default: prisma } = await import('./src/config/database.js');
     await prisma.$connect();
-    const userCount = await prisma.user.count();
-    
-    ResponseHelper.success(res, {
-      connected: true,
-      userCount
-    }, 'Database connection successful');
+    Logger.info('✅ Database connected successfully');
   } catch (error) {
-    ResponseHelper.error(res, `Database connection failed: ${error.message}`, 500);
+    Logger.error('❌ Database connection failed', error);
+    process.exit(1);
   }
-});
+}
 
 // Start server
-const port = config.port || 5000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Test server running on port ${port}`);
+async function startServer() {
+  try {
+    // Test database connection
+    await testDatabaseConnection();
+
+    // Start HTTP server
+    const server = app.listen(config.port, '0.0.0.0', () => {
+      Logger.info(`🚀 Server running on port ${config.port} in ${config.nodeEnv} mode`);
+      Logger.info(`📊 Health check available at http://localhost:${config.port}/health`);
+    });
+
+    // Graceful shutdown
+    const gracefulShutdown = async (signal) => {
+      Logger.info(`${signal} received. Starting graceful shutdown...`);
+      
+      server.close(async () => {
+        Logger.info('HTTP server closed');
+        
+        try {
+          await prisma.$disconnect();
+          Logger.info('Database connection closed');
+          process.exit(0);
+        } catch (error) {
+          Logger.error('Error during database disconnect', error);
+          process.exit(1);
+        }
+      });
+    };
+
+    // Handle shutdown signals
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  } catch (error) {
+    Logger.error('Failed to start server', error);
+    process.exit(1);
+  }
+}
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  Logger.error('Uncaught Exception', error);
+  process.exit(1);
 });
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  Logger.error('Unhandled Rejection at Promise', reason);
+  process.exit(1);
+});
+
+// Start the server
+startServer();

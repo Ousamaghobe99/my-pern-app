@@ -1,0 +1,6 @@
+{
+  "watch": ["."],
+  "ext": "js,json,prisma",
+  "ignore": ["node_modules", "logs"],
+  "exec": "node server.js"
+}

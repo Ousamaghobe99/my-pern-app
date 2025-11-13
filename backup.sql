@@ -279,7 +279,9 @@ CREATE TABLE public.users (
     "phoneNumber" text NOT NULL,
     "roleId" text NOT NULL,
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "updatedAt" timestamp(3) without time zone NOT NULL
+    "updatedAt" timestamp(3) without time zone NOT NULL,
+    "isTemporaryPassword" boolean DEFAULT false NOT NULL,
+    "passwordExpiresAt" timestamp(3) without time zone
 );
 
 
@@ -291,6 +293,7 @@ ALTER TABLE public.users OWNER TO postgres;
 
 COPY public._prisma_migrations (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) FROM stdin;
 6fd8f18c-bc90-490e-942e-c0ac6c7f522d	b920acbbcd2a159ae85afe8cb31e9ddfdf385d2a90be4d5afc551a81f8c7383b	2025-07-26 20:49:06.998304+01	20250726194906_init	\N	\N	2025-07-26 20:49:06.915061+01	1
+d67ac82e-4a32-48b5-ba2d-05f8e4611a90	5f2300840a02d06ba3069c95c8f23b8aee1c05337ec29163028029e940b6acc8	2025-10-30 18:13:47.734631+01	20251030171347_add_temporary_password_fields	\N	\N	2025-10-30 18:13:47.712641+01	1
 \.
 
 
@@ -377,6 +380,9 @@ b59aca66-4991-453a-be65-f81d0b2761ec	b75b9772-a65d-4cde-931f-bfc09405e107	Calibr
 94b0757d-4602-4597-ba5a-5c5c427651ba	b4d322f7-10cd-480e-a0d1-31be44744a59	Preventive	Open	qsdqds	Low	84adfd38-2efb-4d2d-864a-ded7e1afc798	84adfd38-2efb-4d2d-864a-ded7e1afc798	2025-10-11 22:59:59.999	\N	2025-10-07 21:44:27.41	2025-10-07 21:44:27.41
 12a2eeb9-ce73-4b90-a2ab-df2ad28920b2	a4c42d56-3504-484b-b215-5feecf6187d6	Preventive	Open	azaz	Low	84adfd38-2efb-4d2d-864a-ded7e1afc798	4c80aeb0-6831-4684-969a-f78b7a5a8924	2025-11-01 23:59:59.999	\N	2025-10-07 21:46:35.437	2025-10-07 21:46:35.437
 04faa1a8-c5ad-4918-bc7a-de6cd3ef87b1	b4d322f7-10cd-480e-a0d1-31be44744a59	Preventive	Open	qsdqs	Low	84adfd38-2efb-4d2d-864a-ded7e1afc798	4c80aeb0-6831-4684-969a-f78b7a5a8924	2025-10-08 22:59:59.999	\N	2025-10-07 21:48:37.351	2025-10-07 21:48:37.351
+09ba1851-d4a3-459b-89a9-24399ee2ba38	1cacb1e6-6abc-42ed-87f6-e26d2b21e6a5	Preventive	Open	dq	Low	84adfd38-2efb-4d2d-864a-ded7e1afc798	84adfd38-2efb-4d2d-864a-ded7e1afc798	2025-10-17 22:59:59.999	\N	2025-10-17 14:59:20.457	2025-10-17 14:59:20.457
+8955fb39-ddc1-4657-b5c9-acbde1da9533	b75b9772-a65d-4cde-931f-bfc09405e107	Corrective	Open	ww	High	84adfd38-2efb-4d2d-864a-ded7e1afc798	84adfd38-2efb-4d2d-864a-ded7e1afc798	2025-10-29 23:59:59.999	\N	2025-10-28 15:37:19.124	2025-10-28 15:37:19.124
+806dfdd9-435c-4698-bd93-00b6116dbb0d	4c1e1303-d045-4ae2-b98e-e2d30f8a3838	Preventive	Open	qsdsq	Low	84adfd38-2efb-4d2d-864a-ded7e1afc798	4c80aeb0-6831-4684-969a-f78b7a5a8924	2025-10-29 23:59:59.999	\N	2025-10-28 16:53:10.137	2025-10-28 16:53:10.137
 \.
 
 
@@ -447,9 +453,9 @@ dc10f244-cf41-4874-9ccf-4fe7f67c9d24	64bc9530-db2f-4083-b137-852f925d6f86	cafecd
 
 COPY public.roles (id, name, description, "createdAt", "updatedAt") FROM stdin;
 42679380-a23e-4334-8fb3-dcc227d29b85	Administrator	Full system access	2025-07-26 19:58:57.534	2025-07-26 19:58:57.534
-47e60ff3-88d6-4cc2-81dc-0fd2e7cb6369	Manager	Management level access	2025-07-26 19:58:57.539	2025-07-26 19:58:57.539
-7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	Technician	Technical operations access	2025-07-26 19:58:57.542	2025-07-26 19:58:57.542
-64bc9530-db2f-4083-b137-852f925d6f86	Operator	Basic operational access	2025-07-26 19:58:57.544	2025-07-26 19:58:57.544
+47e60ff3-88d6-4cc2-81dc-0fd2e7cb6369	QualityTechnician	Ensures compliance and validates maintenance reports	2025-07-26 19:58:57.539	2025-07-26 19:58:57.539
+64bc9530-db2f-4083-b137-852f925d6f86	CorrectiveTechnician	Handles corrective maintenance tasks and equipment failures.	2025-07-26 19:58:57.544	2025-07-26 19:58:57.544
+7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	PreventiveTechnician	Manages test interfaces and performs preventive maintenance.	2025-07-26 19:58:57.542	2025-07-26 19:58:57.542
 \.
 
 
@@ -465,9 +471,12 @@ COPY public.usage_logs (id, "interfaceId", "userId", "startTime", "endTime", "te
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.users (id, matricule, email, password, "firstName", "lastName", "phoneNumber", "roleId", "createdAt", "updatedAt") FROM stdin;
-84adfd38-2efb-4d2d-864a-ded7e1afc798	ADM001	admin@factory.com	$2a$12$rzmgGX.pYsTehj4mkf0JMODLb1l23OhTCvm5701IiP6CxmMkyVk2m	System	Administrator	+1234567890	42679380-a23e-4334-8fb3-dcc227d29b85	2025-07-26 19:58:58.099	2025-07-26 19:58:58.099
-4c80aeb0-6831-4684-969a-f78b7a5a8924	EMP005	jane.doe@example.com	$2a$12$.sDLgs.qTNtZj5x.x9Wg3OzWh9JiW3rgvV3tTxpFCXghvH/w4Rs6a	Jane	Doe	21698765432	7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	2025-09-01 18:46:09.467	2025-09-01 18:46:09.467
+COPY public.users (id, matricule, email, password, "firstName", "lastName", "phoneNumber", "roleId", "createdAt", "updatedAt", "isTemporaryPassword", "passwordExpiresAt") FROM stdin;
+84adfd38-2efb-4d2d-864a-ded7e1afc798	ADM001	admin@factory.com	$2a$12$rzmgGX.pYsTehj4mkf0JMODLb1l23OhTCvm5701IiP6CxmMkyVk2m	System	Administrator	+1234567890	42679380-a23e-4334-8fb3-dcc227d29b85	2025-07-26 19:58:58.099	2025-07-26 19:58:58.099	f	\N
+49bbf60b-522f-4eb3-8b70-8337f19b04d7	EMP0055	godboussama@gmail.com	$2a$12$cQZqxDC5xw8WywajVWeGQ.CwomQNaTxS9ZYtFlqp1pPk7xFb7nPnG	ouss	ghodh	21678765432	7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	2025-10-31 18:31:13.992	2025-11-01 18:07:45.283	f	\N
+30426d59-3664-47b4-8137-be730afaa3d8	45454545	oussema.ghodbane@iteam-univ.tn	$2a$12$.sDLgs.qTNtZj5x.x9Wg3OzWh9JiW3rgvV3tTxpFCXghvH/w4Rs6a	ddsqsd	sdqsd	454545454545	7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	2025-10-31 19:07:34.392	2025-10-31 19:07:34.392	t	2025-11-07 19:07:34.39
+5debf8d3-1e08-4bd0-bc8a-0160e56a808e	EMP00s55	gsodboussama@gmail.com	$2a$12$mTsJKXvILJfMuaNkL3/xUON.f/P/hdt.rCxXhr81Ha0mLHntMYtK6	ouss	ghodh	21678765432	7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	2025-11-01 17:16:39.169	2025-11-01 18:19:40.101	f	\N
+4c80aeb0-6831-4684-969a-f78b7a5a8924	EMP005	jane.doe@example.com	$2a$12$pJOKhXm3bNBZo6sJvEelDuUtJERWrkd2sZV5CPC517D02s2YoK2pu	Jane	Doe	21698765432	7e7fc476-6c1e-43ac-ae8e-a8c3b63c4952	2025-09-01 18:46:09.467	2025-11-01 18:24:31.602	f	\N
 \.
 
 

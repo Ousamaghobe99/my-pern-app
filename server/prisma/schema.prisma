@@ -105,7 +105,8 @@ model User {
   updatedAt   DateTime @updatedAt @map("updatedAt")
 
   role Role @relation(fields: [roleId], references: [id])
-
+  isTemporaryPassword Boolean  @default(false)
+  passwordExpiresAt    DateTime?
   // Relations for other models (Notification relation removed)
   usageLogs         UsageLog[]
   reportedTickets   MaintenanceTicket[] @relation("ReportedBy")

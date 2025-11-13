@@ -99,7 +99,9 @@ class EmailService {
   }
 
   // Send welcome email with credentials
-  async sendWelcomeWithCredentials({ to, firstName, lastName, matricule, temporaryPassword, userId }) {
+  async sendWelcomeWithCredentials(emailData) {
+  const { to, firstName, lastName, matricule, temporaryPassword } = emailData;
+
     return await this.sendEmail({
       to,
       subject: `Welcome to ${process.env.APP_NAME}`,
@@ -108,13 +110,13 @@ class EmailService {
         firstName,
         lastName,
         matricule,
+        email: to,
         temporaryPassword,
         loginUrl: `${process.env.APP_URL}/login`,
         appName: process.env.APP_NAME,
         year: new Date().getFullYear()
       },
       metadata: {
-        userId,
         type: 'welcome-credentials',
         matricule
       }

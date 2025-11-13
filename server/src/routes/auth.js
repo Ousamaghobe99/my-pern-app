@@ -5,7 +5,8 @@ import { loginValidation,
   registerValidation,
   changePasswordValidation,
   updateProfileValidation,
-  handleValidationErrors
+  handleValidationErrors,
+  changePasswordFirstLoginValidation
  } from '../validators/authValidator.js';
 
 const router = express.Router();
@@ -16,6 +17,11 @@ router.post('/login',
   handleValidationErrors, 
   AuthController.login
 );
+router.post('/change-password-first-login'
+  , changePasswordFirstLoginValidation
+  , handleValidationErrors
+  , AuthController.changePasswordFirstLogin);
+
 
 router.post('/register', 
   registerValidation, 

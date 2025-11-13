@@ -45,6 +45,22 @@ const registerValidation = [
     .isUUID()
     .withMessage('Please provide a valid role ID')
 ];
+// Validation rules for first login password change
+const changePasswordFirstLoginValidation = [
+  body('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  
+  body('currentPassword')
+    .notEmpty()
+    .withMessage('Current (temporary) password is required'),
+
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
+];
 
 // Validation rules for change password
 const changePasswordValidation = [
@@ -102,12 +118,15 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+
+
 export {
   loginValidation,
   registerValidation,
   changePasswordValidation,
   updateProfileValidation,
-  handleValidationErrors
+  handleValidationErrors,
+  changePasswordFirstLoginValidation
 };
 
 export default {
@@ -115,6 +134,7 @@ export default {
   registerValidation,
   changePasswordValidation,
   updateProfileValidation,
-  handleValidationErrors
+  handleValidationErrors,
+  changePasswordFirstLoginValidation
 };
 

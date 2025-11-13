@@ -1,11 +1,14 @@
 import axios from 'axios';
 
-// API base URL - 
+// Get API URLs from runtime config (window._env_) or fallback to import.meta.env
 const API_BASE_URL = window._env_?.VITE_API_URL || import.meta.env.VITE_API_URL;
+const NOTIFICATION_API_URL = window._env_?.VITE_NOTIFICATION_API_URL || import.meta.env.VITE_NOTIFICATION_API_URL || 'http://localhost:3002';
 
+console.log('🌐 API Configuration:');
+console.log('  - Main API:', API_BASE_URL);
+console.log('  - Notification API:', NOTIFICATION_API_URL);
 
-
-// Create axios instance
+// Main API axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -13,7 +16,15 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// 🆕 Notification API axios instance
+const notificationApi = axios.create({
+  baseURL: NOTIFICATION_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor to add auth token (Main API)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
@@ -27,7 +38,21 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+//  Request interceptor for Notification API
+notificationApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle errors (Main API)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -41,6 +66,19 @@ api.interceptors.response.use(
   }
 );
 
+// 🆕 Response interceptor for Notification API
+notificationApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.warn('⚠️ Notification API: Authentication failed');
+      // Don't redirect - just log warning
+      // Notifications are non-critical
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth API
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
@@ -48,6 +86,28 @@ export const authAPI = {
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (userData) => api.put('/auth/profile', userData),
   changePassword: (passwordData) => api.post('/auth/change-password', passwordData),
+  
+  changePasswordFirstLogin: (data, tempToken) => api.post(
+    '/auth/change-password-first-login', 
+    data,
+    {
+      headers: {
+        Authorization: `Bearer ${tempToken}`
+      }
+    }
+  ),
+};
+
+// 🆕 Notification API
+export const notificationAPI = {
+  getNotifications: (params) => notificationApi.get('/api/notifications', { params }),
+  getUnreadCount: () => notificationApi.get('/api/notifications/unread-count'),
+  getStats: () => notificationApi.get('/api/notifications/stats'),
+  getNotification: (id) => notificationApi.get(`/api/notifications/${id}`),
+  markAsRead: (id) => notificationApi.patch(`/api/notifications/${id}/read`),
+  markAllAsRead: () => notificationApi.patch('/api/notifications/mark-all-read'),
+  deleteNotification: (id) => notificationApi.delete(`/api/notifications/${id}`),
+  deleteAllRead: () => notificationApi.delete('/api/notifications/read/all'),
 };
 
 // Users API
@@ -59,6 +119,7 @@ export const usersAPI = {
   updateUser: (id, userData) => api.put(`/users/${id}`, userData),
   deleteUser: (id) => api.delete(`/users/${id}`),
   getUserStatistics: () => api.get('/users/statistics'),
+  getRoles: () => api.get('/users/roles'),
 };
 
 // Interfaces API
@@ -93,10 +154,23 @@ export const maintenanceAPI = {
   getMaintenanceStatistics: () => api.get('/maintenance/statistics'),
 };
 
+// Schedule API
+export const scheduleAPI = {
+  getEvents: (params = {}) => {
+    const serializedParams = {};
+    Object.entries(params).forEach(([key, value]) => {
+      serializedParams[key] = value instanceof Date ? value.toISOString() : value;
+    });
+
+    return api.get('/schedules', { params: serializedParams })
+              .then(res => res.data.data);
+  },
+};
+
 // Health check
 export const healthAPI = {
   check: () => api.get('/health', { baseURL: API_BASE_URL.replace('/api', '') }),
+  checkNotificationService: () => notificationApi.get('/health'),
 };
 
 export default api;
-

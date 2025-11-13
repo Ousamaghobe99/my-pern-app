@@ -4,7 +4,9 @@ import {
   usersAPI, 
   interfacesAPI, 
   locationsAPI, 
-  maintenanceAPI 
+  maintenanceAPI,
+  scheduleAPI,
+  notificationAPI
 } from '../lib/api';
 
 // Auth hooks
@@ -71,6 +73,16 @@ export const useDeleteUser = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['users', 'statistics'] });
+    },
+  });
+};
+export const useRoles = () => {
+  return useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await usersAPI.getRoles();
+      console.log("API roles response:", res); // Debug log
+      return res.data.data; // Return only the roles array
     },
   });
 };
@@ -273,3 +285,72 @@ export const useAddMaintenanceLog = () => {
   });
 };
 
+  export const useScheduleEvents = (params = {}) => {
+    return useQuery({
+      queryKey: ['schedules', 'events', params],
+      queryFn: () => scheduleAPI.getEvents(params),
+      enabled: Object.keys(params).length > 0,
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+
+// Notification hooks
+export const useNotifications = (params = {}) => {
+  return useQuery({
+    queryKey: ['notifications', params],
+    queryFn: () => notificationAPI.getNotifications(params).then(res => res.data),
+    staleTime: 30000, // 30 seconds
+  });
+};
+
+export const useUnreadCount = () => {
+  return useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => notificationAPI.getUnreadCount().then(res => res.data.count),
+    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 30000,
+  });
+};
+
+export const useNotificationStats = () => {
+  return useQuery({
+    queryKey: ['notifications', 'stats'],
+    queryFn: () => notificationAPI.getStats().then(res => res.data),
+  });
+};
+
+export const useMarkAsRead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id) => notificationAPI.markAsRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+  });
+};
+
+export const useMarkAllAsRead = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: () => notificationAPI.markAllAsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+  });
+};
+
+export const useDeleteNotification = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id) => notificationAPI.deleteNotification(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+  });
+};

@@ -11,7 +11,7 @@ export async function connectRabbitMQ() {
     channel = await connection.createChannel();
 
     // Assert main queue
-    await channel.assertQueue(process.env.EMAIL_QUEUE, {
+    await channel.assertQueue(process.env.EMAIL_QUEUE,  {
       durable: true,
       arguments: {
         'x-dead-letter-exchange': '',

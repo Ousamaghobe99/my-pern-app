@@ -5,7 +5,21 @@ export const useInterfaceOperations = () => {
   const deleteInterfaceMutation = useDeleteInterface()
   const updateInterfaceMutation = useUpdateInterface()
   const createInterfaceMutation = useCreateInterface()
-
+  
+const handleCreateInterface = async (interfaceData) => {
+    try {
+      await createInterfaceMutation.mutateAsync(interfaceData)
+      toast.success("Interface created successfully", {
+        description: `${interfaceData.interfaceName} has been added to the system`,
+      })
+      return true
+    } catch (error) {
+      toast.error("Failed to create interface", {
+        description: error?.response?.data?.message || error?.message || "Please try again later",
+      })
+      return false
+    }
+  }
   const handleDelete = async (id, name) => {
     try {
       await deleteInterfaceMutation.mutateAsync(id)
@@ -35,20 +49,7 @@ export const useInterfaceOperations = () => {
     }
   }
 
-  const handleCreateInterface = async (interfaceData) => {
-    try {
-      await createInterfaceMutation.mutateAsync(interfaceData)
-      toast.success("Interface created successfully", {
-        description: `${interfaceData.interfaceName} has been added to the system`,
-      })
-      return true
-    } catch (error) {
-      toast.error("Failed to create interface", {
-        description: error?.response?.data?.message || error?.message || "Please try again later",
-      })
-      return false
-    }
-  }
+  
 
   const handleUpdateInterface = async (interfaceId, interfaceData) => {
     try {

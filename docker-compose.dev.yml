@@ -1,0 +1,170 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: factory_storage_db
+    environment:
+      POSTGRES_DB: intrf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - factory_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d intrf"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: interface-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - factory_network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mongodb:
+    image: mongo:7
+    container_name: interface-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - factory_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Email Service - Development Mode
+  email-service:
+    build:
+      context: ./microservices/email-service
+      dockerfile: Dockerfile.dev
+    container_name: interface-email-service
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASS:-admin123}@rabbitmq:5672
+      MONGODB_URI: mongodb://mongodb:27017/email_service
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@yourcompany.com}
+      FROM_NAME: ${FROM_NAME:-Interface Management System}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      APP_NAME: ${APP_NAME:-Interface Management System}
+      EMAIL_QUEUE: email_queue
+      EMAIL_DLQ: email_dead_letter_queue
+      MAX_RETRIES: 3
+      RETRY_DELAY: 60000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./microservices/email-service/src:/app/src:ro
+      - ./microservices/email-service/logs:/app/logs
+      - /app/node_modules  # Prevent overwriting node_modules
+    networks:
+      - factory_network
+    ports:
+      - "3001:3001"
+
+  # Backend - Development Mode with Hot Reload
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: factory_storage_backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "postgresql://postgres:123456@postgres:5432/intrf?schema=public"
+      JWT_SECRET: "your-super-secret-jwt-key-change-this-in-production"
+      JWT_EXPIRES_IN: "7d"
+      PORT: 5000
+      CORS_ORIGIN: "http://localhost:5173,http://localhost:8080"
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      EMAIL_QUEUE: email_queue
+      USE_EMAIL_QUEUE: "true"
+      APP_NAME: "Interface Management System"
+      APP_URL: "http://localhost:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./server:/app
+      - ./server/logs:/app/logs
+      - /app/node_modules  # Prevent overwriting node_modules
+    networks:
+      - factory_network
+    ports:
+      - "5000:5000"
+    command: npm run dev
+
+  # Frontend - Development Mode with Vite HMR
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+      args:
+        VITE_API_URL: http://localhost:8080/api
+    ports:
+    - "5173:5173"
+    container_name: factory_frontend
+    
+    environment:
+      - VITE_API_URL=http://localhost:8080/api
+    volumes:
+      - ./client:/app:ro
+      - /app/node_modules  # Prevent overwriting node_modules
+    networks:
+      - factory_network
+     # Vite dev server
+    command: npm run dev
+
+  # Nginx - For proxying in development (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: factory_nginx
+    volumes:
+      - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/dev.conf:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+      - email-service
+      - frontend
+    networks:
+      - factory_network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  mongodb_data:
+
+networks:
+  factory_network:
+    driver: bridge

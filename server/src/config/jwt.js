@@ -1,14 +1,17 @@
 import jwt from 'jsonwebtoken';
 import config from './env.js';
 
-export const generateToken = (payload) => {
-  return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn
+export const generateToken = (payload, customExpiresIn) => {
+
+  const expiresIn = customExpiresIn || config.jwt.expiresIn;
+  
+  return jwt.sign(payload, config.jwt.secret, {
+    expiresIn: expiresIn
   });
 };
 
 export const verifyToken = (token) => {
-  return jwt.verify(token, config.jwtSecret);
+  return jwt.verify(token, config.jwt.secret);
 };
 
 export const decodeToken = (token) => {
@@ -20,4 +23,3 @@ export default {
   verifyToken,
   decodeToken
 };
-

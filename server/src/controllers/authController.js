@@ -9,7 +9,7 @@ class AuthController {
     try {
       const { email, password } = req.body;
 
-      const result = await AuthService.login(email, password);
+      const result = await AuthService.login(email, password, req);
 
       ResponseHelper.success(
         res,
@@ -109,8 +109,7 @@ class AuthController {
   // POST /api/auth/logout
   static async logout(req, res) {
     try {
-      // For JWT, logout is handled client-side by removing the token
-      // Server-side logout would require token blacklisting (not implemented here)
+      
       
       Logger.info(`User logged out: ${req.user.email}`);
 
@@ -144,6 +143,32 @@ class AuthController {
       ResponseHelper.error(res, error.message, HTTP_STATUS.BAD_REQUEST);
     }
   }
+static async changePasswordFirstLogin(req, res) {
+  try {
+      const { userId, currentPassword, newPassword } = req.body;
+
+
+    if (!userId || !newPassword|| !currentPassword) {
+      return ResponseHelper.error(
+        res, 
+        'User ID, current password, and new password are required.', 
+        HTTP_STATUS.UNPROCESSABLE_ENTITY
+      );
+    }
+
+    await AuthService.changePasswordFirstLogin(userId, currentPassword, newPassword);
+
+    ResponseHelper.success(
+      res,
+      null,
+      'Password changed successfully. You can now login with your new password.',
+      HTTP_STATUS.OK
+    );
+  } catch (error) {
+    Logger.error('Change password first login controller error', error);
+    ResponseHelper.error(res, error.message, HTTP_STATUS.BAD_REQUEST);
+  }
+}
 }
 
 export default AuthController;

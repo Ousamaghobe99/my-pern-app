@@ -7,8 +7,10 @@ class EmailService {
   }
 
   async queueEmail(emailData) {
+    
     try {
       await rabbitmqService.publishEmail(emailData);
+      
       Logger.info(`✓ Email queued to ${emailData.to}`);
       return { 
         success: true, 
@@ -29,9 +31,7 @@ class EmailService {
       lastName: user.lastName,
       matricule: user.matricule,
       temporaryPassword,
-      userId: user.id,
       metadata: {
-        userId: user.id,
         matricule: user.matricule,
         type: 'welcome-credentials',
         timestamp: new Date().toISOString()

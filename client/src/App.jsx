@@ -12,9 +12,12 @@ import UsersPage from './pages/UsersPage';
 import Maintenance from './pages/Maintenance';
 import Setting from './pages/Setting';
 import Analytics from './pages/Analytics';
+import ChangePasswordFirstLogin from '@/components/ChangePasswordFirstLogin';
 import './App.css';
+import { Toaster } from 'sonner';
 import { User, Users } from 'lucide-react';
-
+import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationToast from './components/NotificationToast';
 // Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,13 +30,17 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
+    
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <NotificationProvider>
+        <NotificationToast />
+        <Toaster position="top-right" richColors />
         <Router>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
-            
+            <Route path="/change-password-first-login" element={<ChangePasswordFirstLogin />} />
             {/* Protected routes */}
             <Route path="/" element={
               <ProtectedRoute>
@@ -78,8 +85,10 @@ function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
+    
   );
 }
 

@@ -6,6 +6,7 @@ import { ERROR_MESSAGES  } from '../utils/constants.js';
 const generalLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.maxRequests,
+  skip: (req) => req.method === 'OPTIONS', // Skip OPTIONS preflight requests
   message: {
     success: false,
     message: ERROR_MESSAGES.RATE_LIMIT_EXCEEDED,
@@ -23,6 +24,7 @@ const generalLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 attempts per window
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later',
@@ -40,6 +42,7 @@ const authLimiter = rateLimit({
 const writeLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 50, // 50 write operations per window
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many write operations, please slow down',
@@ -56,6 +59,7 @@ const writeLimiter = rateLimit({
 const readLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 100, // 100 read operations per window
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many read operations, please slow down',
@@ -72,6 +76,7 @@ const readLimiter = rateLimit({
 const passwordChangeLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // 3 password changes per hour
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many password change attempts, please try again later',
@@ -88,6 +93,7 @@ const passwordChangeLimiter = rateLimit({
 const uploadLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 20, // 20 uploads per window
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many file uploads, please try again later',

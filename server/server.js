@@ -2,70 +2,93 @@ import app from './src/app.js';
 import config from './src/config/env.js';
 import Logger from './src/utils/logger.js';
 import prisma from './src/config/database.js';
+import rabbitmqService from './src/services/rabbitmqService.js'; // Assuming this is the path
 
-// Test database connection
-async function testDatabaseConnection() {
+// ==========================
+// Initialize services
+// ==========================
+async function initializeServices() {
+ try {
+  // --- CRITICAL SERVICE: DATABASE ---
+  Logger.info('🚀 Connecting to database...');
+  await prisma.$connect();
+  Logger.info('✅ Database connected');
+
+  // --- NON-CRITICAL SERVICE: RABBITMQ ---
   try {
-    await prisma.$connect();
-    Logger.info('✅ Database connected successfully');
-  } catch (error) {
-    Logger.error('❌ Database connection failed', error);
-    process.exit(1);
+   Logger.info('🚀 Connecting to RabbitMQ...');
+   await rabbitmqService.connect();
+   Logger.info('✅ RabbitMQ connected');
+  } catch (rabbitError) {
+   // FIX: Log the failure but DO NOT crash the application (process.exit).
+   Logger.error('⚠️ Failed to connect to RabbitMQ (Non-critical). App starting without full queue support.', rabbitError);
   }
+
+ } catch (error) {
+  // Only exit if the critical Database connection failed.
+  Logger.error('❌ CRITICAL Service initialization failed (Database or other error). Exiting.', error);
+  process.exit(1);
+ }
 }
 
+// ==========================
 // Start server
+// ==========================
 async function startServer() {
-  try {
-    // Test database connection
-    await testDatabaseConnection();
+ try {
+  await initializeServices();
 
-    // Start HTTP server
-    const server = app.listen(config.port, '0.0.0.0', () => {
-      Logger.info(`🚀 Server running on port ${config.port} in ${config.nodeEnv} mode`);
-      Logger.info(`📊 Health check available at http://localhost:${config.port}/health`);
+  const server = app.listen(config.port, '0.0.0.0', () => {
+   Logger.info(`🚀 Server running on port ${config.port} in ${config.nodeEnv} mode`);
+   Logger.info(`📊 Health check: http://localhost:${config.port}/health`);
+  });
+
+  // Graceful shutdown
+  const gracefulShutdown = async (signal) => {
+   Logger.info(`\n${signal} received, closing gracefully...`);
+   try {
+    // Close RabbitMQ only if it was connected
+    if (rabbitmqService.isHealthy()) {
+     await rabbitmqService.close();
+     Logger.info('✓ RabbitMQ connection closed');
+    }
+
+    await prisma.$disconnect();
+    Logger.info('✓ Database connection closed');
+
+    server.close(() => {
+     Logger.info('✓ HTTP server closed');
+     process.exit(0);
     });
-
-    // Graceful shutdown
-    const gracefulShutdown = async (signal) => {
-      Logger.info(`${signal} received. Starting graceful shutdown...`);
-      
-      server.close(async () => {
-        Logger.info('HTTP server closed');
-        
-        try {
-          await prisma.$disconnect();
-          Logger.info('Database connection closed');
-          process.exit(0);
-        } catch (error) {
-          Logger.error('Error during database disconnect', error);
-          process.exit(1);
-        }
-      });
-    };
-
-    // Handle shutdown signals
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-  } catch (error) {
-    Logger.error('Failed to start server', error);
+   } catch (error) {
+    Logger.error('❌ Error during shutdown', error);
     process.exit(1);
-  }
+   }
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+ } catch (error) {
+  Logger.error('❌ Failed to start server', error);
+  process.exit(1);
+ }
 }
 
-// Handle uncaught exceptions
+// ==========================
+// Global exception handling
+// ==========================
 process.on('uncaughtException', (error) => {
-  Logger.error('Uncaught Exception', error);
-  process.exit(1);
+ Logger.error('❌ Uncaught Exception', error);
+ process.exit(1);
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  Logger.error('Unhandled Rejection at Promise', reason);
-  process.exit(1);
+process.on('unhandledRejection', (reason) => {
+ Logger.error('❌ Unhandled Rejection', reason);
+ process.exit(1);
 });
 
-// Start the server
+// ==========================
+// Launch
+// ==========================
 startServer();
-

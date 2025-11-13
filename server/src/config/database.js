@@ -4,7 +4,7 @@ import config from './env.js';
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: config.databaseUrl
+      url: config.database.url
     }
   },
   log: config.nodeEnv === 'development' ? ['query', 'info', 'warn', 'error'] : ['error']

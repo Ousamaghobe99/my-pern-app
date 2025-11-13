@@ -131,81 +131,95 @@ class UserService {
       throw error;
     }
   }
+//Create new user
+static async createUser(userData) {
+  try {
+    const { matricule, email, password, firstName, lastName, phoneNumber, roleId } = userData;
 
-  // Create new user
-  static async createUser(userData) {
-    try {
-      const { matricule, email, password, firstName, lastName, phoneNumber, roleId } = userData;
-
-      // Check if user already exists
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { email },
-            { matricule }
-          ]
-        }
-      });
-
-      if (existingUser) {
-        if (existingUser.email === email) {
-          throw new Error(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
-        }
-        if (existingUser.matricule === matricule) {
-          throw new Error(ERROR_MESSAGES.MATRICULE_ALREADY_EXISTS);
-        }
+    // Check if user already exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          { matricule }
+        ]
       }
+    });
 
-      // Verify role exists
-      const role = await prisma.role.findUnique({
-        where: { id: roleId }
-      });
-
-      if (!role) {
-        throw new Error('Invalid role specified');
+    if (existingUser) {
+      if (existingUser.email === email) {
+        throw new Error(ERROR_MESSAGES.EMAIL_ALREADY_EXISTS);
       }
+      if (existingUser.matricule === matricule) {
+        throw new Error(ERROR_MESSAGES.MATRICULE_ALREADY_EXISTS);
+      }
+    }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
+    // Verify role exists
+    const role = await prisma.role.findUnique({
+      where: { id: roleId }
+    });
 
-      // Create user
-      const newUser = await prisma.user.create({
-        data: {
-          matricule,
-          email,
-          password: hashedPassword,
-          firstName,
-          lastName,
-          phoneNumber,
-          roleId
-        },
-        select: {
-          id: true,
-          matricule: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phoneNumber: true,
-          createdAt: true,
-          updatedAt: true,
-          role: {
-            select: {
-              id: true,
-              name: true,
-              description: true
-            }
+    if (!role) {
+      throw new Error('Invalid role specified');
+    }
+
+    //  Generate temporary password =====
+    const temporaryPassword = crypto.randomBytes(8).toString('hex'); // 16 characters
+
+    // Hash the temporary password
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+
+    // Create user with temporary password flag
+    const newUser = await prisma.user.create({
+      data: {
+        matricule,
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        phoneNumber,
+        roleId,
+       isTemporaryPassword: true, 
+        passwordExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        
+      },
+      select: {
+        id: true,
+        matricule: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phoneNumber: true,
+        createdAt: true,
+        updatedAt: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true
           }
         }
-      });
+      }
+    });
 
-      Logger.info(`User created: ${newUser.email}`);
+    Logger.info(`User created: ${newUser.email}`);
 
-      return newUser;
-    } catch (error) {
-      Logger.error('Create user error', error);
-      throw error;
-    }
+    //Send welcome email with credentials (non-blocking) =====
+    emailService.sendWelcomeWithCredentials(newUser, temporaryPassword)
+      .catch(err => Logger.error('Failed to queue welcome email:', err));
+    
+
+    // Return user without password 
+    return {
+      ...newUser,
+      message: 'User created successfully. Credentials have been sent to their email.'
+    };
+  } catch (error) {
+    Logger.error('Create user error', error);
+    throw error;
   }
+}
 
   // Update user
   static async updateUser(id, updateData) {

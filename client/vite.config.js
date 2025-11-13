@@ -6,6 +6,24 @@
   // https://vite.dev/config/
   export default defineConfig({
     plugins: [react(),tailwindcss()],
+      server: {
+        host: '0.0.0.0', 
+        port: 5173,      
+        watch: {
+        usePolling: true
+      }
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000/', // Docker service name OR 'http://localhost:5000' if running locally
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+    hmr: {
+      host: 'localhost',
+      port: 5173,
+    },  
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

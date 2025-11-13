@@ -34,7 +34,16 @@ export function validateUserData(userData) {
   } else if (userData.email.length > 100) {
     errors.push('Email must not exceed 100 characters')
   }
-
+// Matricule validation
+if (!userData?.matricule?.trim()) {
+  errors.push('Matricule is required')
+} else if (userData.matricule.trim().length < 3) {
+  errors.push('Matricule must be at least 3 characters')
+} else if (userData.matricule.trim().length > 20) {
+  errors.push('Matricule must not exceed 20 characters')
+} else if (!/^[A-Z0-9]+$/.test(userData.matricule.trim())) {
+  errors.push('Matricule must contain only uppercase letters and numbers')
+}
   // Phone number validation
   if (!userData?.phoneNumber?.trim()) {
     errors.push('Phone number is required')
@@ -80,7 +89,12 @@ export function validateUserField(field, value) {
       if (!value?.trim()) return 'Phone number is required'
       if (!isValidPhoneNumber(value)) return 'Invalid phone number format'
       return null
-
+    case 'matricule':
+      if (!value?.trim()) return 'Matricule is required'
+      if (value.trim().length < 3) return 'Matricule must be at least 3 characters'
+      if (value.trim().length > 20) return 'Matricule must not exceed 20 characters'
+      if (!/^[A-Z0-9]+$/.test(value.trim())) return 'Matricule must contain only uppercase letters and numbers'
+      return null
     case 'roleId':
       if (!value) return 'Role is required'
       return null
@@ -102,6 +116,7 @@ export function formatUserData(userData) {
     lastName: userData.lastName?.trim() || '',
     email: userData.email?.trim().toLowerCase() || '',
     phoneNumber: userData.phoneNumber?.trim() || '',
+    matricule: userData.matricule?.trim().toUpperCase() || '',
     roleId: userData.roleId || ''
   }
 }

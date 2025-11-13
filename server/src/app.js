@@ -1,16 +1,15 @@
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-
 import config from './config/env.js';
+import corsMiddleware from './middleware/corsMiddleware.js';
+import limiter from './middleware/rateLimiter.js';
 import Logger from './utils/logger.js';
 import ResponseHelper from './utils/responseHelper.js';
-import { ERROR_MESSAGES  } from './utils/constants.js';
+
 
 // Import middleware
-import { errorHandler  } from './middleware/errorHandler.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -18,47 +17,21 @@ import userRoutes from './routes/users.js';
 import interfaceRoutes from './routes/interfaces.js';
 import locationRoutes from './routes/locations.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
 
 const app = express();
 
-// Trust proxy for rate limiting and IP detection
+// Trust proxy for IP detection
 app.set('trust proxy', 1);
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
-  message: {
-    success: false,
-    message: ERROR_MESSAGES.RATE_LIMIT_EXCEEDED,
-    timestamp: new Date().toISOString()
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-// Security middleware
+// Security and CORS
 app.use(helmet());
-app.use(limiter);
-
-// CORS configuration
-app.use(cors({
-  origin: config.corsOrigin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(corsMiddleware);
 
 // Logging middleware
 if (config.nodeEnv === 'development') {
   app.use(morgan('combined'));
 }
-
-// Custom logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -68,7 +41,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
+// Body parsers
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health check - skip rate limiter for testing
 app.get('/health', (req, res) => {
   ResponseHelper.success(res, {
     status: 'OK',
@@ -78,12 +55,17 @@ app.get('/health', (req, res) => {
   }, 'Server is healthy');
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/interfaces', interfaceRoutes);
-app.use('/api/locations', locationRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
+// Routes with specific rate limiters
+app.use('/api/auth', limiter.authLimiter, authRoutes);          // strict auth limiter
+app.use('/api/users/change-password', limiter.passwordChangeLimiter); // very strict for password changes
+app.use('/api/users', limiter.readLimiter, userRoutes);          // lenient for GET, add writeLimiter inside route for POST/PUT/DELETE
+app.use('/api/interfaces', limiter.readLimiter, interfaceRoutes);
+app.use('/api/locations', limiter.readLimiter, locationRoutes);
+app.use('/api/maintenance', limiter.writeLimiter, maintenanceRoutes);
+app.use('/api/schedules', limiter.writeLimiter, scheduleRoutes);
+
+// Optional: apply general limiter to all remaining routes
+app.use(limiter.generalLimiter);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -94,4 +76,3 @@ app.use('*', (req, res) => {
 app.use(errorHandler);
 
 export default app;
-
