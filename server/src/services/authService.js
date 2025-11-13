@@ -3,6 +3,7 @@ import prisma from '../config/database.js';
 import { generateToken  } from '../config/jwt.js';
 import { ERROR_MESSAGES  } from '../utils/constants.js';
 import Logger from '../utils/logger.js';
+import rabbitmqService from './rabbitmqService.js';
 
 class AuthService {
   // User login
@@ -189,6 +190,22 @@ class AuthService {
       };
 
       Logger.info(`New user registered: ${newUser.email}`);
+
+      // Send notification
+      try {
+        const notificationPayload = {
+          type: 'USER_REGISTERED',
+          data: {
+            userId: newUser.id,
+            email: newUser.email,
+            name: `${newUser.firstName} ${newUser.lastName}`,
+          },
+        };
+        await rabbitmqService.publish('notifications', JSON.stringify(notificationPayload));
+        Logger.info(`Published USER_REGISTERED event for ${newUser.email}`);
+      } catch (error) {
+        Logger.error('Failed to publish USER_REGISTERED event', error);
+      }
 
       return {
         user: responseUser,
