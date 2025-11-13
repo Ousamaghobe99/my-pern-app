@@ -1,5 +1,6 @@
 const Notification = require('../models/notificationModel');
 const logger = require('../utils/logger');
+const { sendToUser } = require('../config/socket');
 
 /**
  * Create a new notification
@@ -26,6 +27,9 @@ async function createNotification(data) {
       userId: notification.userId,
       type: notification.type,
     });
+
+    // Emit event to user
+    sendToUser(data.userId, 'notification:new', notification);
 
     return notification;
   } catch (error) {
@@ -145,6 +149,16 @@ async function markAsRead(notificationId, userId) {
       userId,
     });
 
+    // Emit event to user
+    sendToUser(userId, 'notification:updated', {
+      id: notificationId,
+      read: true
+    });
+
+    // Update unread count for user
+    const unreadCount = await getUnreadCount(userId);
+    sendToUser(userId, 'notification:unreadCount', { count: unreadCount });
+
     return notification;
   } catch (error) {
     logger.error('❌ Failed to mark as read:', error);
@@ -172,6 +186,10 @@ async function markAllAsRead(userId) {
       modifiedCount: result.modifiedCount,
     });
 
+    // Emit event to user
+    sendToUser(userId, 'notifications:allRead');
+    sendToUser(userId, 'notification:unreadCount', { count: 0 });
+
     return result;
   } catch (error) {
     logger.error('❌ Failed to mark all as read:', error);
@@ -198,6 +216,13 @@ async function deleteNotification(notificationId, userId) {
       userId,
     });
 
+    // Emit event to user
+    sendToUser(userId, 'notification:deleted', { id: notificationId });
+
+    // Update unread count for user
+    const unreadCount = await getUnreadCount(userId);
+    sendToUser(userId, 'notification:unreadCount', { count: unreadCount });
+
     return result;
   } catch (error) {
     logger.error('❌ Failed to delete notification:', error);
@@ -219,6 +244,9 @@ async function deleteAllRead(userId) {
       userId,
       deletedCount: result.deletedCount,
     });
+
+    // Emit event to user
+    sendToUser(userId, 'notifications:allReadDeleted');
 
     return result;
   } catch (error) {

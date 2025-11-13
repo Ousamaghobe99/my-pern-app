@@ -10,26 +10,52 @@ const { sendToUser } = require('../config/socket');
 async function processNotification(message) {
   const { type, data, metadata } = message;
 
-  logger.info(`📨 Processing notification: ${type}`, { 
+  logger.info(`📨 Processing notification: ${type}`, {
     email: data.email,
-    attemptNumber: metadata?.attemptNumber || 1 
+    attemptNumber: metadata?.attemptNumber || 1,
   });
 
   let result;
+  let notificationData = {};
 
   switch (type) {
     case 'USER_CREATED':
     case 'USER_REGISTERED':
       result = await emailService.sendWelcomeEmail(data);
+      notificationData = {
+        title: 'Welcome to the Platform!',
+        message: `Hi ${data.name || ''}, welcome! We're glad to have you.`,
+        actionUrl: '/dashboard',
+      };
       break;
 
     case 'FIRST_LOGIN':
       result = await emailService.sendFirstLoginEmail(data);
+      notificationData = {
+        title: 'First Login Successful',
+        message: 'You have successfully logged in for the first time.',
+        actionUrl: '/profile',
+      };
       break;
 
     case 'PASSWORD_CHANGED':
     case 'PASSWORD_RESET':
       result = await emailService.sendPasswordChangedEmail(data);
+      notificationData = {
+        title: 'Password Security Update',
+        message: 'Your password was changed. If you did not make this change, please contact support.',
+        actionUrl: '/security-settings',
+      };
+      break;
+
+    case 'LIVE_NOTIFICATION':
+      result = {}; // No email sent for this type
+      notificationData = {
+        title: data.title,
+        message: data.message,
+        actionUrl: data.actionUrl,
+        category: data.category || 'info',
+      };
       break;
 
     default:
@@ -37,18 +63,21 @@ async function processNotification(message) {
       throw new Error(`Unknown notification type: ${type}`);
   }
 
-  // Save notification to database
-  await notificationService.saveNotification({
-    type,
-    recipient: data.email,
-    status: 'sent',
-    messageId: result.messageId,
-    sentAt: new Date(),
-    metadata: {
-      ...metadata,
-      subject: result.subject,
-    },
-  });
+  // Save notification to database if userId is present
+  if (data.userId) {
+    const newNotification = await notificationService.createNotification({
+      userId: data.userId,
+      type,
+      ...notificationData,
+      metadata: {
+        ...metadata,
+        emailMessageId: result?.messageId,
+      },
+    });
+
+    // Send live notification
+    sendToUser(data.userId, 'notification:new', newNotification);
+  }
 
   return result;
 }
@@ -136,18 +165,6 @@ async function startConsumer() {
             email: message?.data?.email,
             attempts: attemptNumber,
           });
-
-          // Save failed notification to database
-          if (message) {
-            await notificationService.saveNotification({
-              type: message.type,
-              recipient: message.data?.email,
-              status: 'failed',
-              error: error.message,
-              failedAt: new Date(),
-              metadata: message.metadata,
-            }).catch(err => logger.error('Failed to save error notification:', err));
-          }
 
           // Reject without requeue (goes to DLQ via dead letter exchange)
           channel.nack(msg, false, false);
