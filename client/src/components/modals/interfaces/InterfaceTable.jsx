@@ -9,11 +9,12 @@ import {
   AlertDialogContent,AlertDialogDescription,
   AlertDialogFooter,AlertDialogHeader,AlertDialogTitle,AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Eye, Trash2, Edit } from "lucide-react";
+import { Eye, Trash2, Edit, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { getStatusColor } from "@/lib/utils";
 import ViewInterfaceDialog from "./ViewInterfaceDialog";
 import EditInterfaceDialog from "./EditInterfaceDialog";
+import QRCodeModal from "./QRCodeModal";
 export default function InterfaceTable({
   interfaces,onDelete,
   onStatusUpdate,onUpdate,
@@ -23,6 +24,8 @@ export default function InterfaceTable({
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [editInterface, setEditInterface] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState(null);
+  const [isQrCodeModalOpen, setIsQrCodeModalOpen] = useState(false);
 
   const handleViewInterface = (interfaceData) => {
     setViewInterface(interfaceData);
@@ -51,6 +54,11 @@ export default function InterfaceTable({
     onDelete(interfaceId, interfaceName);
   };
 
+  const handleViewQrCode = (data) => {
+    setQrCodeData(data);
+    setIsQrCodeModalOpen(true);
+  };
+
   return (
     <>
       <Table>
@@ -62,6 +70,7 @@ export default function InterfaceTable({
             <TableHead>Status</TableHead>
             <TableHead>Location</TableHead>
             <TableHead>Last Update</TableHead>
+            <TableHead>QR Code</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -119,6 +128,19 @@ export default function InterfaceTable({
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {i.updatedAt ? format(new Date(i.updatedAt), "Pp") : "N/A"}
+                </TableCell>
+                <TableCell>
+                  {i.qrCodeData ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewQrCode(i.qrCodeData)}
+                    >
+                      <QrCode className="h-3 w-3 mr-1" /> View QR
+                    </Button>
+                  ) : (
+                    "N/A"
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
@@ -204,6 +226,13 @@ export default function InterfaceTable({
         onCancel={handleCancelEdit}
         isLoading={isUpdating}
         formOptions={formOptions}
+      />
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        open={isQrCodeModalOpen}
+        onOpenChange={setIsQrCodeModalOpen}
+        qrCodeData={qrCodeData}
       />
     </>
   );

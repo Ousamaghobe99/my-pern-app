@@ -18,6 +18,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
+import { QrCode } from "lucide-react"
 
 // Import your validation functions
 import { validateInterfaceData } from "@/lib/interfaceValidation"
@@ -187,6 +188,29 @@ export default function AddInterfaceDialog({
                 )) || []}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* QR Code */}
+          <div className="grid grid-cols-1 gap-2">
+            <Label>QR Code Data</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                value={newInterface.qrCodeData || ""}
+                onChange={(e) => handleChange("qrCodeData", e.target.value)}
+                placeholder="Scan or paste QR code data"
+              />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Simulate scanning by pasting from clipboard
+                  navigator.clipboard.readText().then((text) => {
+                    handleChange("qrCodeData", text)
+                  })
+                }}
+              >
+                <QrCode className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Show all validation errors at the bottom */}
